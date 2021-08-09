@@ -2,3 +2,7 @@ tags
 __pycache__/
 vk_config.v2.json
 .mypy_cache/
+.passwd
+cache/
+.hypothesis/
+utils/
