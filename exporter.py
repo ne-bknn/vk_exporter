@@ -54,6 +54,11 @@ llog = LLog
 def auth() -> Tuple[vk.vk_api.VkApi, vk.vk_api.VkApiMethod]:
     """Interactively authenticates user and returns api object"""
 
+    def captcha_handler(captcha):
+        key = input("Enter captcha code {0}: ".format(captcha.get_url())).strip()
+
+        return captcha.try_again(key)
+
     def mfa_handler() -> Tuple[str, int]:
         code = input("OTP code: ")
         return code, 0
@@ -64,7 +69,9 @@ def auth() -> Tuple[vk.vk_api.VkApi, vk.vk_api.VkApiMethod]:
         login = input("Email or phone number: ")
         password = getpass()
 
-    session = vk.VkApi(login, password, auth_handler=mfa_handler)
+    session = vk.VkApi(
+        login, password, auth_handler=mfa_handler, captcha_handler=captcha_handler
+    )
     session.auth()
 
     api = session.get_api()
