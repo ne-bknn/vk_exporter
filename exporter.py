@@ -15,7 +15,7 @@ import typer
 import vk_api as vk  # type: ignore
 from vk_api import audio as vk_audio_api
 
-DEBUG = True
+DEBUG = False
 app = typer.Typer()
 
 
@@ -93,9 +93,9 @@ def get_posts(
         step_amount = min(step, n_posts)
         ic(step_amount)
 
-        yield api.wall.get(
-            domain=page_id, count=step_amount, offset=offset * step
-        )["items"]
+        yield api.wall.get(domain=page_id, count=step_amount, offset=offset * step)[
+            "items"
+        ]
 
         n_posts -= step_amount
         offset += 1
@@ -127,7 +127,7 @@ def process_post_json(post: Dict[str, Any], api) -> Dict[str, Any]:
     def download_video(video: Dict[str, Any]) -> Optional[Dict[str, str]]:
         """Internal VK videos most likely wont be
         accessible if original page is not accessible"""
-        
+
         ic(video)
         video = video["video"]
 
@@ -138,7 +138,9 @@ def process_post_json(post: Dict[str, Any], api) -> Dict[str, Any]:
         except KeyError:
             access_key = ""
 
-        full_id = f"{owner_id}_{video_id}" + (f"_{access_key}" if access_key != "" else "")
+        full_id = f"{owner_id}_{video_id}" + (
+            f"_{access_key}" if access_key != "" else ""
+        )
         ic(f"{owner_id}_{video_id}")
         real_video = api.video.get(videos=full_id, count=1, owner_id=owner_id)
         ic(real_video)
@@ -185,7 +187,7 @@ def url_to_domain(url: str) -> str:
 
 
 def domain_to_id(domain: str, api: vk.vk_api.VkApiMethod) -> int:
-    data = api.utils.resolveScreenName(screen_name=domain)["response"]
+    data = api.utils.resolveScreenName(screen_name=domain)
     obj_type: str = data["type"]
     obj_id: int = data["object_id"]
 
@@ -215,6 +217,20 @@ def initialize_table(page_id: str) -> sqlite3.Connection:
     return db
 
 
+def save_html(htmls: List[str], page_id: str, post_id: int):
+    wd = pathlib.PurePath("cache", page_id, "wikis", str(post_id))
+    try:
+        pathlib.Path(wd).mkdir(parents=True)
+    except FileExistsError:
+        if len(htmls) == list(os.listdir(pathlib.Path(wd))):
+            llog.info(f"Wiki from {post_id} are downloaded")
+            return
+
+    for i, content in enumerate(htmls):
+        with open(pathlib.PurePath(wd, str(i)), "w") as f:
+            f.write(content)
+
+
 def save_photos(photo_urls: List[str], page_id: str, post_id: int):
     wd = pathlib.PurePath("cache", page_id, "photos", str(post_id))
     try:
@@ -241,9 +257,7 @@ def save_photos(photo_urls: List[str], page_id: str, post_id: int):
             f.write(content)
 
 
-def save_audios(
-    audio_objs: List[Dict[str, str]], page_id: str, post_id: int, session
-):
+def save_audios(audio_objs: List[Dict[str, str]], page_id: str, post_id: int, session):
     wd = pathlib.PurePath("cache", page_id, "audios", str(post_id))
     audio_api = vk_audio_api.VkAudio(session)
     try:
@@ -255,9 +269,7 @@ def save_audios(
 
     audios = []
     for audio_obj in audio_objs:
-        content = audio_api.get_audio_by_id(
-            audio_obj["owner_id"], audio_obj["id"]
-        )
+        content = audio_api.get_audio_by_id(audio_obj["owner_id"], audio_obj["id"])
         audios.append(content)
 
     audio_files = []
@@ -276,6 +288,21 @@ def save_audios(
     for i, content in enumerate(audio_files):
         with open(pathlib.PurePath(wd, str(i)), "wb") as f:  # type: ignore
             f.write(content)
+
+
+def extract_wiki(text: str, numeric_page_id: int, api) -> List[str]:
+    wiki_re = re.compile(f"https:\/\/vk\.com\/topic{numeric_page_id}_[\d]{{1,20}}")
+    urls = wiki_re.findall(text)
+    page_ids = [urls.split("_")[-1] for url in urls]
+    resps = [
+        api.pages.get(owner_id=numeric_page_id, page_id=page_id, need_html=1)
+        for page_id in page_ids
+    ]
+    htmls = []
+    for resp in resps:
+        htmls.append(resp["html"])
+
+    return htmls
 
 
 def save_data(
@@ -320,11 +347,15 @@ def save_data(
     save_photos([photo["url"] for photo in photos], page_id, post_id)
     save_audios(audios, page_id, post_id, session)
 
+    api = session.get_api()
+    htmls = extract_wiki(text, domain_to_id(page_id, api), api)
+    save_html(htmls, page_id, post_id)
+
 
 def init_working_directory(page_id: str):
     pathlib.Path(f"cache/{page_id}").mkdir(parents=True, exist_ok=True)
 
-    for t in ["photos", "videos", "audios"]:
+    for t in ["photos", "videos", "audios", "wikis"]:
         pathlib.Path(f"cache/{page_id}/{t}").mkdir(parents=True, exist_ok=True)
 
 
