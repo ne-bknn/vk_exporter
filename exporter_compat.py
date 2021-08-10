@@ -8,7 +8,8 @@ import sys
 from collections import defaultdict
 from collections.abc import Mapping
 from getpass import getpass
-#from typing import Any, Callable, Dict, Hashable, Iterator, List, Tuple, Optional
+
+# from typing import Any, Callable, Dict, Hashable, Iterator, List, Tuple, Optional
 
 import requests  # type: ignore
 import typer
@@ -36,15 +37,15 @@ else:
 # output helpers
 class LLog:
     @classmethod
-    def info(cls, s     ):
+    def info(cls, s):
         typer.secho(f"[.] {s}")
 
     @classmethod
-    def success(cls, s     ):
+    def success(cls, s):
         typer.secho(f"[+] {s}", fg=typer.colors.GREEN)
 
     @classmethod
-    def err(cls, s     ):
+    def err(cls, s):
         typer.secho(f"[-] {s}", fg=typer.colors.RED)
 
 
@@ -85,9 +86,7 @@ def auth():
     return session, api
 
 
-def get_posts(
-    page_id     , n_posts     , api                       
-):
+def get_posts(page_id, n_posts, api):
     total_posts = api.wall.get(domain=page_id, count=1, offset=0)["count"]
 
     n_posts = min(n_posts, total_posts) if n_posts != -1 else total_posts
@@ -123,15 +122,15 @@ def process_post_json(post, api):
     def download_photo(photo):
         photos = photo["photo"]["sizes"]
         best_pic = max(photos, key=getter("height"))
-        url      = best_pic["url"]
+        url = best_pic["url"]
         return {"type": "photo", "url": url}
 
-    def download_audio(audio                ):
+    def download_audio(audio):
         audio_id = audio["audio"]["id"]
         owner_id = audio["audio"]["owner_id"]
         return {"type": "audio", "id": audio_id, "owner_id": owner_id}
 
-    def download_video(video                ):
+    def download_video(video):
         """Internal VK videos most likely wont be
         accessible if original page is not accessible"""
 
@@ -163,7 +162,7 @@ def process_post_json(post, api):
     except KeyError:
         attachments = []
 
-    real_attachments            = []
+    real_attachments = []
     for attachment in attachments:
         if attachment["type"] == "photo":
             real_attachments.append(download_photo(attachment))
@@ -174,7 +173,7 @@ def process_post_json(post, api):
         if attachment["type"] == "video":
             real_attachments.append(download_video(attachment))
 
-    res                 = {
+    res = {
         "text": text,
         "attachments": real_attachments,
         "post_id": post_id,
@@ -183,7 +182,7 @@ def process_post_json(post, api):
     return res
 
 
-def url_to_domain(url     ):
+def url_to_domain(url):
     domain_re = re.compile("^[a-zA-Z0-9_]{4,100}$")
     domain = url.split("/")[-1]
     if not domain_re.match(domain):
@@ -193,10 +192,10 @@ def url_to_domain(url     ):
     return domain
 
 
-def domain_to_id(domain     , api                       ):
+def domain_to_id(domain, api):
     data = api.utils.resolveScreenName(screen_name=domain)
-    obj_type      = data["type"]
-    obj_id      = data["object_id"]
+    obj_type = data["type"]
+    obj_id = data["object_id"]
 
     if obj_type == "group":
         obj_id = -obj_id
@@ -204,11 +203,11 @@ def domain_to_id(domain     , api                       ):
     return obj_id
 
 
-def render_html(db                    ):
+def render_html(db):
     pass
 
 
-def initialize_table(page_id     ):
+def initialize_table(page_id):
     db = sqlite3.connect(f"cache/{page_id}/posts.db")
     sql_create_table = """CREATE TABLE IF NOT EXISTS posts (
             id INT NOT NULL PRIMARY KEY,
@@ -224,7 +223,7 @@ def initialize_table(page_id     ):
     return db
 
 
-def save_html(htmls           , page_id     , post_id     ):
+def save_html(htmls, page_id, post_id):
     wd = pathlib.PurePath("cache", page_id, "wikis", str(post_id))
     try:
         pathlib.Path(wd).mkdir(parents=True)
@@ -238,7 +237,7 @@ def save_html(htmls           , page_id     , post_id     ):
             f.write(content)
 
 
-def save_photos(photo_urls           , page_id     , post_id     ):
+def save_photos(photo_urls, page_id, post_id):
     wd = pathlib.PurePath("cache", page_id, "photos", str(post_id))
     try:
         pathlib.Path(wd).mkdir(parents=True)
@@ -264,7 +263,7 @@ def save_photos(photo_urls           , page_id     , post_id     ):
             f.write(content)
 
 
-def save_audios(audio_objs                      , page_id     , post_id     , session):
+def save_audios(audio_objs, page_id, post_id, session):
     wd = pathlib.PurePath("cache", page_id, "audios", str(post_id))
     audio_api = vk_audio_api.VkAudio(session)
     try:
@@ -297,7 +296,7 @@ def save_audios(audio_objs                      , page_id     , post_id     , se
             f.write(content)
 
 
-def extract_wiki(text     , numeric_page_id     , api):
+def extract_wiki(text, numeric_page_id, api):
     wiki_re = re.compile(f"https:\/\/vk\.com\/topic{numeric_page_id}_[\d]{{1,20}}")
     urls = wiki_re.findall(text)
     page_ids = [url.split("_")[-1] for url in urls]
@@ -312,9 +311,7 @@ def extract_wiki(text     , numeric_page_id     , api):
     return htmls
 
 
-def save_data(
-    post                , db                    , page_id     , session
-):
+def save_data(post, db, page_id, session):
     post = defaultdict(str, post)
     c = db.cursor()
     sql_insert_post = """INSERT INTO posts (id, text, photos, audios, videos) VALUES (?, ?, ?, ?, ?)"""
@@ -354,12 +351,12 @@ def save_data(
     save_photos([photo["url"] for photo in photos], page_id, post_id)
     save_audios(audios, page_id, post_id, session)
 
-    api = session.get_api()
-    htmls = extract_wiki(text, domain_to_id(page_id, api), api)
-    save_html(htmls, page_id, post_id)
+    #api = session.get_api()
+    #htmls = extract_wiki(text, domain_to_id(page_id, api), api)
+    #save_html(htmls, page_id, post_id)
 
 
-def init_working_directory(page_id     ):
+def init_working_directory(page_id):
     pathlib.Path(f"cache/{page_id}").mkdir(parents=True, exist_ok=True)
 
     for t in ["photos", "videos", "audios", "wikis"]:
@@ -367,7 +364,7 @@ def init_working_directory(page_id     ):
 
 
 @app.command()
-def run(url     , n_posts      = -1):
+def run(url, n_posts=-1):
     """Run full set of actions: get posts, download media, rendering html"""
     session, api = auth()
     page_id = url_to_domain(url)
@@ -386,13 +383,13 @@ def run(url     , n_posts      = -1):
 
 
 @app.command()
-def get(url     , n_posts      = -1, db_path      = "./cache.db"):
+def get(url, n_posts=-1, db_path="./cache.db"):
     """Download data only (no files)"""
     pass
 
 
 @app.command()
-def clean(url     , full       = typer.Option(False, "-f")):
+def clean(url, full=typer.Option(False, "-f")):
     """Clean the cache"""
     db_path = f"cache/{url_to_domain(url)}/posts.db"
     ic(db_path)
