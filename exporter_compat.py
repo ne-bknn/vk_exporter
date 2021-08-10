@@ -8,7 +8,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Mapping
 from getpass import getpass
-from typing import Any, Callable, Dict, Hashable, Iterator, List, Tuple, Optional
+#from typing import Any, Callable, Dict, Hashable, Iterator, List, Tuple, Optional
 
 import requests  # type: ignore
 import typer
@@ -36,15 +36,15 @@ else:
 # output helpers
 class LLog:
     @classmethod
-    def info(cls, s: str):
+    def info(cls, s     ):
         typer.secho(f"[.] {s}")
 
     @classmethod
-    def success(cls, s: str):
+    def success(cls, s     ):
         typer.secho(f"[+] {s}", fg=typer.colors.GREEN)
 
     @classmethod
-    def err(cls, s: str):
+    def err(cls, s     ):
         typer.secho(f"[-] {s}", fg=typer.colors.RED)
 
 
@@ -86,7 +86,7 @@ def auth():
 
 
 def get_posts(
-    page_id: str, n_posts: int, api: vk.vk_api.VkApiMethod
+    page_id     , n_posts     , api                       
 ):
     total_posts = api.wall.get(domain=page_id, count=1, offset=0)["count"]
 
@@ -108,11 +108,11 @@ def get_posts(
         offset += 1
 
 
-def process_post_json(post: Dict[str, Any], api):
-    def getter(*args: Hashable):
+def process_post_json(post, api):
+    def getter(*args):
         """Helper to retrieve data from heavily nested JSONs"""
 
-        def _getter(x: Mapping[Any, Any]):
+        def _getter(x):
             for k in args:
                 x = x[k]
 
@@ -120,18 +120,18 @@ def process_post_json(post: Dict[str, Any], api):
 
         return _getter
 
-    def download_photo(photo: Dict[str, Any]):
+    def download_photo(photo):
         photos = photo["photo"]["sizes"]
         best_pic = max(photos, key=getter("height"))
-        url: str = best_pic["url"]
+        url      = best_pic["url"]
         return {"type": "photo", "url": url}
 
-    def download_audio(audio: Dict[str, Any]):
+    def download_audio(audio                ):
         audio_id = audio["audio"]["id"]
         owner_id = audio["audio"]["owner_id"]
         return {"type": "audio", "id": audio_id, "owner_id": owner_id}
 
-    def download_video(video: Dict[str, Any]):
+    def download_video(video                ):
         """Internal VK videos most likely wont be
         accessible if original page is not accessible"""
 
@@ -163,7 +163,7 @@ def process_post_json(post: Dict[str, Any], api):
     except KeyError:
         attachments = []
 
-    real_attachments: List[Any] = []
+    real_attachments            = []
     for attachment in attachments:
         if attachment["type"] == "photo":
             real_attachments.append(download_photo(attachment))
@@ -174,7 +174,7 @@ def process_post_json(post: Dict[str, Any], api):
         if attachment["type"] == "video":
             real_attachments.append(download_video(attachment))
 
-    res: Dict[str, Any] = {
+    res                 = {
         "text": text,
         "attachments": real_attachments,
         "post_id": post_id,
@@ -183,7 +183,7 @@ def process_post_json(post: Dict[str, Any], api):
     return res
 
 
-def url_to_domain(url: str):
+def url_to_domain(url     ):
     domain_re = re.compile("^[a-zA-Z0-9_]{4,100}$")
     domain = url.split("/")[-1]
     if not domain_re.match(domain):
@@ -193,10 +193,10 @@ def url_to_domain(url: str):
     return domain
 
 
-def domain_to_id(domain: str, api: vk.vk_api.VkApiMethod):
+def domain_to_id(domain     , api                       ):
     data = api.utils.resolveScreenName(screen_name=domain)
-    obj_type: str = data["type"]
-    obj_id: int = data["object_id"]
+    obj_type      = data["type"]
+    obj_id      = data["object_id"]
 
     if obj_type == "group":
         obj_id = -obj_id
@@ -204,11 +204,11 @@ def domain_to_id(domain: str, api: vk.vk_api.VkApiMethod):
     return obj_id
 
 
-def render_html(db: sqlite3.Connection):
+def render_html(db                    ):
     pass
 
 
-def initialize_table(page_id: str):
+def initialize_table(page_id     ):
     db = sqlite3.connect(f"cache/{page_id}/posts.db")
     sql_create_table = """CREATE TABLE IF NOT EXISTS posts (
             id INT NOT NULL PRIMARY KEY,
@@ -224,7 +224,7 @@ def initialize_table(page_id: str):
     return db
 
 
-def save_html(htmls: List[str], page_id: str, post_id: int):
+def save_html(htmls           , page_id     , post_id     ):
     wd = pathlib.PurePath("cache", page_id, "wikis", str(post_id))
     try:
         pathlib.Path(wd).mkdir(parents=True)
@@ -238,7 +238,7 @@ def save_html(htmls: List[str], page_id: str, post_id: int):
             f.write(content)
 
 
-def save_photos(photo_urls: List[str], page_id: str, post_id: int):
+def save_photos(photo_urls           , page_id     , post_id     ):
     wd = pathlib.PurePath("cache", page_id, "photos", str(post_id))
     try:
         pathlib.Path(wd).mkdir(parents=True)
@@ -264,7 +264,7 @@ def save_photos(photo_urls: List[str], page_id: str, post_id: int):
             f.write(content)
 
 
-def save_audios(audio_objs: List[Dict[str, str]], page_id: str, post_id: int, session):
+def save_audios(audio_objs                      , page_id     , post_id     , session):
     wd = pathlib.PurePath("cache", page_id, "audios", str(post_id))
     audio_api = vk_audio_api.VkAudio(session)
     try:
@@ -297,7 +297,7 @@ def save_audios(audio_objs: List[Dict[str, str]], page_id: str, post_id: int, se
             f.write(content)
 
 
-def extract_wiki(text: str, numeric_page_id: int, api):
+def extract_wiki(text     , numeric_page_id     , api):
     wiki_re = re.compile(f"https:\/\/vk\.com\/topic{numeric_page_id}_[\d]{{1,20}}")
     urls = wiki_re.findall(text)
     page_ids = [urls.split("_")[-1] for url in urls]
@@ -313,7 +313,7 @@ def extract_wiki(text: str, numeric_page_id: int, api):
 
 
 def save_data(
-    post: Dict[Any, Any], db: sqlite3.Connection, page_id: str, session
+    post                , db                    , page_id     , session
 ):
     post = defaultdict(str, post)
     c = db.cursor()
@@ -359,7 +359,7 @@ def save_data(
     save_html(htmls, page_id, post_id)
 
 
-def init_working_directory(page_id: str):
+def init_working_directory(page_id     ):
     pathlib.Path(f"cache/{page_id}").mkdir(parents=True, exist_ok=True)
 
     for t in ["photos", "videos", "audios", "wikis"]:
@@ -367,7 +367,7 @@ def init_working_directory(page_id: str):
 
 
 @app.command()
-def run(url: str, n_posts: int = -1):
+def run(url     , n_posts      = -1):
     """Run full set of actions: get posts, download media, rendering html"""
     session, api = auth()
     page_id = url_to_domain(url)
@@ -386,13 +386,13 @@ def run(url: str, n_posts: int = -1):
 
 
 @app.command()
-def get(url: str, n_posts: int = -1, db_path: str = "./cache.db"):
+def get(url     , n_posts      = -1, db_path      = "./cache.db"):
     """Download data only (no files)"""
     pass
 
 
 @app.command()
-def clean(url: str, full: bool = typer.Option(False, "-f")):
+def clean(url     , full       = typer.Option(False, "-f")):
     """Clean the cache"""
     db_path = f"cache/{url_to_domain(url)}/posts.db"
     ic(db_path)
