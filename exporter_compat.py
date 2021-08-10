@@ -300,7 +300,7 @@ def save_audios(audio_objs                      , page_id     , post_id     , se
 def extract_wiki(text     , numeric_page_id     , api):
     wiki_re = re.compile(f"https:\/\/vk\.com\/topic{numeric_page_id}_[\d]{{1,20}}")
     urls = wiki_re.findall(text)
-    page_ids = [urls.split("_")[-1] for url in urls]
+    page_ids = [url.split("_")[-1] for url in urls]
     resps = [
         api.pages.get(owner_id=numeric_page_id, page_id=page_id, need_html=1)
         for page_id in page_ids
